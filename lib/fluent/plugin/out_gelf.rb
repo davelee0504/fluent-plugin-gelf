@@ -5,7 +5,7 @@ class GELFOutput < BufferedOutput
   Plugin.register_output("gelf", self)    
 
   config_param :use_record_host, :bool, :default => false
-  config_param :add_msec_time, :bool, :default => false
+  config_param :add_msec_time, :bool, :default => true
   config_param :host, :string, :default => nil
   config_param :port, :integer, :default => 12201
 
@@ -35,7 +35,8 @@ class GELFOutput < BufferedOutput
 
   def format(tag, time, record)
     gelfentry = { :timestamp => time, :_tag => tag }
-
+    real_msg = ""
+    detail_time = ""
     record.each_pair do |k,v|
       case k
       when 'version' then
@@ -66,17 +67,26 @@ class GELFOutput < BufferedOutput
         else
           gelfentry[:_msec] = v
         end
-      when 'short_message', 'full_message', 'facility', 'line', 'file' then
+        detail_time = (time.to_s + "." + v).to_f
+      when 'short_message', 'full_message', 'facility', 'line', 'file', 'message' then
         gelfentry[k] = v
+        real_msg = v
       else
         gelfentry['_'+k] = v
+        real_msg = v
       end
     end
+    if real_msg.to_s == '' 
+       real_msg = "EMPTY" 
+    end  
 
-    if !gelfentry.has_key?('short_message') then
-      gelfentry[:short_message] = record.to_json
-    end
-
+    
+    gelfentry[:timestamp] = detail_time 
+    
+    #if !gelfentry.has_key?('short_message') then
+      #gelfentry[:short_message] = record.to_json
+      gelfentry[:short_message] = real_msg 
+    #end
     gelfentry.to_msgpack
   end
 
